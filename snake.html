@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Snake</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="d3.v5.min.js"></script>
+</head>
+
+<body>
+
+</body>
+<script>
+    var config = {
+        scale: {
+            CONTAINER: 20,
+            FRAME: 15
+        },
+        container: {
+            WIDTH: 40,
+            HEIGHT: 30,
+            COLOR: "#aaa",
+            MARGIN: 2
+        },
+        snake: {
+            color: {
+                HEAD:"yellow",
+                BODY:"red"
+            },
+            init: {
+                inflex_point: [{
+                    x: 0,
+                    y: 3
+                }],
+                head: {
+                    x: 3,
+                    y: 3
+                },
+                speed: {
+                    x: 1,
+                    y: 0
+                },
+                length: 3,
+                controller_lock: true
+            }
+        },
+        food: {
+            COLOR: "green",
+        }
+    }
+    var data = {
+        snake: JSON.parse(JSON.stringify(config.snake.init)),
+        food: {
+            x: 0,
+            y: 0
+        }
+    }
+    var container = d3.select("body")
+        .append("svg")
+    function initBackgound() {
+        container.style("width", config.scale.CONTAINER * config.container.WIDTH)
+            .style("height", config.scale.CONTAINER * config.container.HEIGHT)
+        for (var i = 0; i < config.container.HEIGHT; i++) {
+            for (var j = 0; j < config.container.WIDTH; j++) {
+                container.append("rect")
+                    .style("fill", config.container.COLOR)
+                    .style("width", config.scale.CONTAINER - config.container.MARGIN)
+                    .style("height", config.scale.CONTAINER - config.container.MARGIN)
+                    .attr("x", j * config.scale.CONTAINER + config.container.MARGIN / 2)
+                    .attr("y", i * config.scale.CONTAINER + config.container.MARGIN / 2)
+            }
+        }
+    }
+    function renderSnake() {
+        var snake_tile = []
+        snake_tile.push({
+            x: data.snake.head.x,
+            y: data.snake.head.y
+        })
+        for (var i = 0; i < data.snake.inflex_point.length; i++) {
+            var point = data.snake.inflex_point[i]
+            var MAX = 100
+            while (true) {
+                var last_tile = snake_tile[snake_tile.length - 1]
+                var move = {
+                    x: point.x - last_tile.x == 0 ? 0 : (point.x - last_tile.x) / Math.abs(point.x - last_tile.x),
+                    y: point.y - last_tile.y == 0 ? 0 : (point.y - last_tile.y) / Math.abs(point.y - last_tile.y)
+                }
+                if (move.x == 0 && move.y == 0) {
+                    break
+                }
+
+                if (data.snake.length == snake_tile.length) {
+                    data.snake.inflex_point.splice(i+1)
+                    break;
+                }
+                var tile = {
+                    x: snake_tile[snake_tile.length - 1].x + move.x,
+                    y: snake_tile[snake_tile.length - 1].y + move.y
+                }
+                if (tile.x == data.snake.head.x && tile.y == data.snake.head.y) {
+                    die()
+                }
+
+                snake_tile.push(tile)
+            }
+        }
+        var snake = container.selectAll(".snake-tile").data(snake_tile)
+        snake.transition().duration(1000 / config.scale.FRAME)
+            .attr("x", tile => tile.x * config.scale.CONTAINER + config.container.MARGIN / 2)
+            .attr("y", tile => tile.y * config.scale.CONTAINER + config.container.MARGIN / 2)
+        snake.enter().append("rect")
+            .attr("class", "snake-tile")
+            .style("fill", function(tile,i){
+                return i==0?config.snake.color.HEAD:config.snake.color.BODY
+            })
+            .style("width", config.scale.CONTAINER - config.container.MARGIN)
+            .style("height", config.scale.CONTAINER - config.container.MARGIN)
+            .attr("x", tile => tile.x * config.scale.CONTAINER + config.container.MARGIN / 2)
+            .attr("y", tile => tile.y * config.scale.CONTAINER + config.container.MARGIN / 2)
+        snake.exit().remove();
+        data.snake.controller_lock = true
+    }
+
+    function addSnakeController() {
+        var changeSnakeDir = function (x, y) {
+            if (!data.snake.controller_lock) {
+                return
+            }
+            var new_speed = {
+                x: data.snake.speed.x && x ? data.snake.speed.x : x,
+                y: data.snake.speed.y && y ? data.snake.speed.y : y
+            }
+            if (data.snake.speed.x != new_speed.x || data.snake.speed.y != new_speed.y) {
+                data.snake.inflex_point.splice(0, 0, {
+                    x: data.snake.head.x,
+                    y: data.snake.head.y
+                })
+            }
+            data.snake.speed = new_speed
+            data.snake.controller_lock = false
+        }
+        window.addEventListener("keydown", function (event) {
+            switch (event.key) {
+                case "ArrowDown": changeSnakeDir(0, 1); break;
+                case "ArrowUp": changeSnakeDir(0, -1); break;
+                case "ArrowLeft": changeSnakeDir(-1, 0); break;
+                case "ArrowRight": changeSnakeDir(1, 0); break;
+            }
+        });
+    }
+
+    function rednerFood() {
+        data.food = {
+            x: Math.floor(Math.random() * config.container.WIDTH),
+            y: Math.floor(Math.random() * config.container.HEIGHT)
+        }
+        var food = container.selectAll("#food")
+        food.transition().duration(1000 / config.scale.FRAME)
+            .attr("x", data.food.x * config.scale.CONTAINER + config.container.MARGIN / 2)
+            .attr("y", data.food.y * config.scale.CONTAINER + config.container.MARGIN / 2)
+        food.data([data.food]).enter().append("rect").attr("id", "food")
+            .style("fill", config.food.COLOR)
+            .style("width", config.scale.CONTAINER - config.container.MARGIN)
+            .style("height", config.scale.CONTAINER - config.container.MARGIN)
+            .attr("x", data.food.x * config.scale.CONTAINER + config.container.MARGIN / 2)
+            .attr("y", data.food.y * config.scale.CONTAINER + config.container.MARGIN / 2)
+    }
+
+    function die() {
+        var restart = function () {
+            data.snake = JSON.parse(JSON.stringify(config.snake.init))
+        }
+        restart()
+    }
+    function eat() {
+        data.snake.length += 1
+        rednerFood()
+    }
+
+    initBackgound();
+    renderSnake()
+    addSnakeController()
+    rednerFood()
+    setInterval(function () {
+        data.snake.head.x += data.snake.speed.x
+        data.snake.head.y += data.snake.speed.y
+        if ((data.snake.head.x < 0 || data.snake.head.x >= config.container.WIDTH)
+            || (data.snake.head.y < 0 || data.snake.head.y >= config.container.HEIGHT)) {
+            die()
+        }
+        if (data.snake.head.x == data.food.x && data.snake.head.y == data.food.y) {
+            eat()
+        }
+        renderSnake()
+    }, 1000 / config.scale.FRAME)
+</script>
+</html>
